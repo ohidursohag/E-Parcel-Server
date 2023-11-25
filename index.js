@@ -46,7 +46,7 @@ const client = new MongoClient(uri, {
 async function run() {
    try {
       // Connect the client to the server	(optional starting in v4.7)
-      client.connect();
+      // client.connect();
       // Send a ping to confirm a successful connection
       client.db("admin").command({ ping: 1 });
       console.log("Pinged your deployment. You successfully connected to MongoDB!");
@@ -56,6 +56,12 @@ async function run() {
    }
 }
 run().catch(console.dir);
+
+// Database Collection
+const userCollection = client.db('eParcelDB').collection('users');
+
+
+
 
 // JWT:: Create Access token 
 app.post('/e-parcel/api/v1/auth/access-token', async (req, res) => {
@@ -70,6 +76,55 @@ app.post('/e-parcel/api/v1/auth/access-token', async (req, res) => {
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
    }).send({ success: true });
 })
+
+// Clear access token when user logged out
+app.get('/e-parcel/api/v1/logout', async (req, res) => {
+   try {
+      res.clearCookie('accessToken', {
+         maxAge: 0,
+         secure: process.env.NODE_ENV === 'production',
+         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict'
+      }).send({ success: true });
+   } catch (error) {
+      return res.send({ error: true, error: error.message });
+   }
+})
+
+// --------- User Collection Apis ---------
+// Save or modify user email, status in DB
+app.put('/e-parcel/api/v1/create-or-update-user/:email', verifyToken, async (req, res) => {
+   try {
+
+      const email = req.params.email;
+      const user = req.body;
+      if (email !== req.user?.email) {
+         return res.status(403).send({ message: 'Forbidden Access', code: 403 });
+      }
+      // console.log(user);
+      const query = { email: email };
+      const option = { upsert: true };
+      const isExist = await userCollection.findOne(query);
+      const updateDoc = {
+         $set: { ...user }
+      }
+      // console.log(updateDoc);
+      // console.log('User found?----->', isExist)
+      if (isExist) {
+         return res.send('User Alredy exist ------>')
+      }
+      const result = await userCollection.updateOne(query, updateDoc, option);
+      console.log('user updated?----->', result);
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+
+
+
+
+
+
 
 // Test Api
 app.get('/', (req, res) => {

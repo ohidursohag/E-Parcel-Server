@@ -59,6 +59,7 @@ run().catch(console.dir);
 
 // Database Collection
 const userCollection = client.db('eParcelDB').collection('users');
+const parcelBookingCollection = client.db('eParcelDB').collection('parcelBookings');
 
 
 
@@ -94,7 +95,6 @@ app.get('/e-parcel/api/v1/logout', async (req, res) => {
 // Save or modify user email, status in DB
 app.put('/e-parcel/api/v1/create-or-update-user/:email', verifyToken, async (req, res) => {
    try {
-
       const email = req.params.email;
       const user = req.body;
       if (email !== req.user?.email) {
@@ -113,15 +113,39 @@ app.put('/e-parcel/api/v1/create-or-update-user/:email', verifyToken, async (req
          return res.send('User Alredy exist ------>')
       }
       const result = await userCollection.updateOne(query, updateDoc, option);
-      console.log('user updated?----->', result);
+      console.log('user updated?----->');
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+// get single user data
+app.get('/e-parcel/api/v1/get-user-data/:email', verifyToken, async (req, res) => {
+   try {
+      const email = req.params.email;
+      if (email !== req.user?.email) {
+         return res.status(403).send({ message: 'Forbidden Access', code: 403 })
+      }
+      const query = { email: email };
+      const result = await userCollection.findOne(query);
+      //   console.log('user data -------->',result);
       return res.send(result);
    } catch (error) {
       return res.send({ error: true, message: error.message });
    }
 })
 
-
-
+// -------- Parcel Booking Collection Apis--------------
+// Add booked Parcel 
+app.post('/e-parcel/api/v1/book-parcel', verifyToken, async (req, res) => {
+  try {
+     const bookingData = req.body;
+     const result = await parcelBookingCollection.insertOne(bookingData);
+     return res.send(result);
+  } catch (error) {
+     return res.send({ error: true, message: error.message });
+  }
+})
 
 
 

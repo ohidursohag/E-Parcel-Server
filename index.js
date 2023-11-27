@@ -119,6 +119,17 @@ app.put('/e-parcel/api/v1/create-or-update-user/:email', verifyToken, async (req
       return res.send({ error: true, message: error.message });
    }
 })
+// Get all users data api 
+// get all users
+// {ToDo verifyAdmin }
+app.get('/e-parcel/api/v1/all-users', verifyToken, async (req, res) => {
+   try {
+      const result = await userCollection.find().toArray()
+      return res.send(result)
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
 // get single user data
 app.get('/e-parcel/api/v1/get-user-data/:email', verifyToken, async (req, res) => {
    try {
@@ -146,9 +157,19 @@ app.post('/e-parcel/api/v1/book-parcel', verifyToken, async (req, res) => {
      return res.send({ error: true, message: error.message });
   }
 })
+// Get All Parcel Bookings data
+app.get('/e-parcel/api/v1/all-bookings-data', verifyToken, async (req, res) => {
+   try {  
+      console.log('Hit korce');
+      const result = await parcelBookingCollection.find().toArray();
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
 
 // Get Single booking data by Id
-app.get('/e-parcel/api/v1/booking-data/:id', verifyToken, async (req, res) => { 
+app.get('/e-parcel/api/v1/booking-data/:id',  async (req, res) => { 
    try {
       const { id } = req.params;
       const query = { _id: new ObjectId(id) };
@@ -162,6 +183,9 @@ app.get('/e-parcel/api/v1/booking-data/:id', verifyToken, async (req, res) => {
 app.get('/e-parcel/api/v1/user-booking-data/:email', verifyToken, async (req, res) => { 
    try {
       const { email } = req.params;
+      if (email !== req.user?.email) {
+         return res.status(403).send({ message: 'Forbidden Access', code: 403 })
+      }
       const query = { senderEmail: email };
       const result = await parcelBookingCollection.find(query).toArray();
       return res.send(result);

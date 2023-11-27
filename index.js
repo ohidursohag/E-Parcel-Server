@@ -159,7 +159,7 @@ app.get('/e-parcel/api/v1/booking-data/:id', verifyToken, async (req, res) => {
    }   
 })
 // Get user specific  bookings data by email address 
-app.get('/e-parcel/api/v1/booking-data/:email', verifyToken, async (req, res) => { 
+app.get('/e-parcel/api/v1/user-booking-data/:email', verifyToken, async (req, res) => { 
    try {
       const { email } = req.params;
       const query = { senderEmail: email };
@@ -169,6 +169,22 @@ app.get('/e-parcel/api/v1/booking-data/:email', verifyToken, async (req, res) =>
       return res.send({ error: true, message: error.message });
    }   
 })
+
+// Change/update bookings data
+app.patch('/e-parcel/api/v1/update-booking-data/:id', verifyToken, async (req, res) => {
+   try {
+      const { id } = req.params;
+      const updateBookingData = req.body
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+         $set: { ...updateBookingData }
+      }
+      const result = await parcelBookingCollection.updateOne(filter, updatedDoc)
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+ })
 
 
 

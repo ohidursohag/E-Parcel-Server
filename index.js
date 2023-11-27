@@ -147,6 +147,29 @@ app.post('/e-parcel/api/v1/book-parcel', verifyToken, async (req, res) => {
   }
 })
 
+// Get Single booking data by Id
+app.get('/e-parcel/api/v1/booking-data/:id', verifyToken, async (req, res) => { 
+   try {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+      const result = await parcelBookingCollection.findOne(query);
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }   
+})
+// Get user specific  bookings data by email address 
+app.get('/e-parcel/api/v1/booking-data/:email', verifyToken, async (req, res) => { 
+   try {
+      const { email } = req.params;
+      const query = { senderEmail: email };
+      const result = await parcelBookingCollection.find(query).toArray();
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }   
+})
+
 
 
 

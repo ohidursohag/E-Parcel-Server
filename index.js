@@ -35,6 +35,18 @@ const verifyToken = async (req, res, next) => {
    })
 }
 
+// Verify Admin
+const verifyAdmin = async (req, res, next) => {
+   const email = req.user?.email
+   const query = { email: email };
+   const user = await userCollection.findOne(query);
+   const isAdmin = user?.role === 'admin';
+   if (!isAdmin) {
+      return res.status(403).send({ message: 'Forbidden Access', code: 403 });
+   }
+   next();
+}
+
 const uri = process.env.MONGO_DB_URI;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -123,7 +135,7 @@ app.put('/e-parcel/api/v1/create-or-update-user/:email', verifyToken, async (req
 })
 // Get all users data api 
 // {ToDo verifyAdmin }
-app.get('/e-parcel/api/v1/all-users', verifyToken, async (req, res) => {
+app.get('/e-parcel/api/v1/all-users', verifyToken, verifyAdmin, async (req, res) => {
    try {
       let queryObj = {};
       // filtering
@@ -169,10 +181,10 @@ app.get('/e-parcel/api/v1/get-user-data/:email', verifyToken, async (req, res) =
       return res.send({ error: true, message: error.message });
    }
 })
+
 // get single user data by id 
 app.get('/e-parcel/api/v1/get-user-data/:id', verifyToken, async (req, res) => {
    try {
-
       const id = req.params.id;
       if (email !== req.user?.email) {
          return res.status(403).send({ message: 'Forbidden Access', code: 403 })
@@ -230,6 +242,7 @@ app.get('/e-parcel/api/v1/booking-data/:id', async (req, res) => {
       return res.send({ error: true, message: error.message });
    }
 })
+
 // Get user specific  bookings data by email address 
 app.get('/e-parcel/api/v1/user-booking-data/:email', verifyToken, async (req, res) => {
    try {
@@ -277,11 +290,11 @@ app.post('/e-parcel/api/v1/add-review', verifyToken, async (req, res) => {
 // Get All review  data
 app.get('/e-parcel/api/v1/all-Review-data', verifyToken, async (req, res) => {
    try {
-      let queryObj = {};
       console.log('hit request ------>');
+      let queryObj = {};
       // filtering
       const deliveryManId = req.query?.deliveryManId;
-      // console.log(req.query);
+      console.log(req.query);
       if (deliveryManId) {
          queryObj.deliveryManId = deliveryManId;
       }

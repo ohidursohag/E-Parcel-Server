@@ -11,6 +11,7 @@ const app = express();
 app.use(cors({
    origin: [
       "http://localhost:5173",
+      "https://e-parcel-f5214.web.app"
    ],
    credentials: true,
 }));
@@ -60,6 +61,7 @@ run().catch(console.dir);
 // Database Collection
 const userCollection = client.db('eParcelDB').collection('users');
 const parcelBookingCollection = client.db('eParcelDB').collection('parcelBookings');
+const reviewsCollection = client.db('eParcelDB').collection('reviews');
 
 
 
@@ -92,7 +94,7 @@ app.get('/e-parcel/api/v1/logout', async (req, res) => {
 })
 
 // --------- User Collection Apis ---------
-// Save or modify user email, status in DB
+// Save or modify user  user info when register / google login
 app.put('/e-parcel/api/v1/create-or-update-user/:email', verifyToken, async (req, res) => {
    try {
       const email = req.params.email;
@@ -120,20 +122,58 @@ app.put('/e-parcel/api/v1/create-or-update-user/:email', verifyToken, async (req
    }
 })
 // Get all users data api 
-// get all users
 // {ToDo verifyAdmin }
 app.get('/e-parcel/api/v1/all-users', verifyToken, async (req, res) => {
    try {
-      const result = await userCollection.find().toArray()
+      let queryObj = {};
+      // filtering
+      const role = req.query?.role;
+      if (role) {
+         queryObj.role = role;
+      }
+      const result = await userCollection.find(queryObj).toArray()
       return res.send(result)
    } catch (error) {
       return res.send({ error: true, message: error.message });
    }
 })
-// get single user data
+// update User data api
+app.patch('/e-parcel/api/v1/update-user-data/:id', verifyToken, async (req, res) => {
+   try {
+      console.log('user updated?----->');
+      const { id } = req.params;
+      const updateUserData = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+         $set: { ...updateUserData }
+      }
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+
+// get single user data by email 
 app.get('/e-parcel/api/v1/get-user-data/:email', verifyToken, async (req, res) => {
    try {
       const email = req.params.email;
+      if (email !== req.user?.email) {
+         return res.status(403).send({ message: 'Forbidden Access', code: 403 })
+      }
+      const query = { email: email };
+      const result = await userCollection.findOne(query);
+      //   console.log('user data -------->',result);
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+// get single user data by id 
+app.get('/e-parcel/api/v1/get-user-data/:id', verifyToken, async (req, res) => {
+   try {
+
+      const id = req.params.id;
       if (email !== req.user?.email) {
          return res.status(403).send({ message: 'Forbidden Access', code: 403 })
       }
@@ -149,27 +189,38 @@ app.get('/e-parcel/api/v1/get-user-data/:email', verifyToken, async (req, res) =
 // -------- Parcel Booking Collection Apis--------------
 // Add booked Parcel 
 app.post('/e-parcel/api/v1/book-parcel', verifyToken, async (req, res) => {
-  try {
-     const bookingData = req.body;
-     const result = await parcelBookingCollection.insertOne(bookingData);
-     return res.send(result);
-  } catch (error) {
-     return res.send({ error: true, message: error.message });
-  }
-})
-// Get All Parcel Bookings data
-app.get('/e-parcel/api/v1/all-bookings-data', verifyToken, async (req, res) => {
-   try {  
-      console.log('Hit korce');
-      const result = await parcelBookingCollection.find().toArray();
+   try {
+      const bookingData = req.body;
+      const result = await parcelBookingCollection.insertOne(bookingData);
       return res.send(result);
    } catch (error) {
       return res.send({ error: true, message: error.message });
    }
 })
+// Get All Parcel Bookings data
+app.get('/e-parcel/api/v1/all-bookings-data', verifyToken, async (req, res) => {
+   try {
+      let queryObj = {};
+      console.log('hit request ------>');
+      // filtering
+      const deliveryManId = req.query?.deliveryManId;
+      // console.log(req.query);
+      if (deliveryManId ) {
+         queryObj.deliveryManId = deliveryManId;
+      }
+      // console.log(queryObj);
+      console.log(deliveryManId);
+      const result = await parcelBookingCollection.find(queryObj).toArray();
+      // console.log(result);
+      return res.send(result);
+   } catch (error) {
+      console.log(error);
+      return res.send({ error: true, message: error.message });
+   }
+})
 
 // Get Single booking data by Id
-app.get('/e-parcel/api/v1/booking-data/:id',  async (req, res) => { 
+app.get('/e-parcel/api/v1/booking-data/:id', async (req, res) => {
    try {
       const { id } = req.params;
       const query = { _id: new ObjectId(id) };
@@ -177,10 +228,10 @@ app.get('/e-parcel/api/v1/booking-data/:id',  async (req, res) => {
       return res.send(result);
    } catch (error) {
       return res.send({ error: true, message: error.message });
-   }   
+   }
 })
 // Get user specific  bookings data by email address 
-app.get('/e-parcel/api/v1/user-booking-data/:email', verifyToken, async (req, res) => { 
+app.get('/e-parcel/api/v1/user-booking-data/:email', verifyToken, async (req, res) => {
    try {
       const { email } = req.params;
       if (email !== req.user?.email) {
@@ -191,7 +242,7 @@ app.get('/e-parcel/api/v1/user-booking-data/:email', verifyToken, async (req, re
       return res.send(result);
    } catch (error) {
       return res.send({ error: true, message: error.message });
-   }   
+   }
 })
 
 // Change/update bookings data
@@ -208,10 +259,42 @@ app.patch('/e-parcel/api/v1/update-booking-data/:id', verifyToken, async (req, r
    } catch (error) {
       return res.send({ error: true, message: error.message });
    }
- })
+})
 
 
+// ------------ Reviews collection Apis ------------>
+// Add Review
+app.post('/e-parcel/api/v1/add-review', verifyToken, async (req, res) => {
+   try {
+      const reviewData = req.body;
+      const result = await reviewsCollection.insertOne(reviewData);
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
 
+// Get All review  data
+app.get('/e-parcel/api/v1/all-Review-data', verifyToken, async (req, res) => {
+   try {
+      let queryObj = {};
+      console.log('hit request ------>');
+      // filtering
+      const deliveryManId = req.query?.deliveryManId;
+      // console.log(req.query);
+      if (deliveryManId) {
+         queryObj.deliveryManId = deliveryManId;
+      }
+      // console.log(queryObj);
+      console.log(deliveryManId);
+      const result = await reviewsCollection.find(queryObj).toArray();
+      // console.log(result);
+      return res.send(result);
+   } catch (error) {
+      console.log(error);
+      return res.send({ error: true, message: error.message });
+   }
+})
 
 // Test Api
 app.get('/', (req, res) => {

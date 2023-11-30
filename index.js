@@ -5,6 +5,7 @@ const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const app = express();
 
 // middleware
@@ -104,6 +105,8 @@ app.get('/e-parcel/api/v1/logout', async (req, res) => {
       return res.send({ error: true, error: error.message });
    }
 })
+
+
 
 // --------- User Collection Apis ---------
 // Save or modify user  user info when register / google login
@@ -217,7 +220,7 @@ app.get('/e-parcel/api/v1/all-bookings-data', verifyToken, async (req, res) => {
       // filtering
       const deliveryManId = req.query?.deliveryManId;
       // console.log(req.query);
-      if (deliveryManId ) {
+      if (deliveryManId) {
          queryObj.deliveryManId = deliveryManId;
       }
       // console.log(queryObj);
@@ -316,3 +319,18 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
    console.log(`server listening on port ${port}`);
 });
+
+
+// -------- Payment Apis -------  
+// Generate client secret for stripe payment
+app.post('/create-payment-intent', verifyToken, async (req, res) => {
+   const { price } = req.body
+   const amount = parseInt(price * 100)
+   if (!price || amount < 1) return
+   const { client_secret } = await stripe.paymentIntents.create({
+      amount: amount,
+      currency: 'usd',
+      payment_method_types: ['card'],
+   })
+   res.send({ clientSecret: client_secret })
+})

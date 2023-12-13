@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const port = process.env.PORT || 5000
+const port = process.env.PORT || 5000 || 5001 || 5002
 const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const app = express();
 
@@ -75,6 +75,7 @@ run().catch(console.dir);
 const userCollection = client.db('eParcelDB').collection('users');
 const parcelBookingCollection = client.db('eParcelDB').collection('parcelBookings');
 const reviewsCollection = client.db('eParcelDB').collection('reviews');
+const paymentHistoryCollection = client.db('eParcelDB').collection('paymentHistory');
 
 
 
@@ -307,7 +308,127 @@ app.get('/e-parcel/api/v1/all-Review-data', verifyToken, async (req, res) => {
       // console.log(result);
       return res.send(result);
    } catch (error) {
-      console.log(error);
+      // console.log(error);
+      return res.send({ error: true, message: error.message });
+   }
+})
+
+
+
+
+// -------- Payment Apis -------  
+// Generate client secret for stripe payment
+app.post('/e-parcel/api/v1/create-payment-intent', verifyToken, async (req, res) => {
+   try {
+      const { price } = req.body;
+      const amount = Number(price * 100);
+      if (!price || amount < 1) return;
+      const { client_secret } = await stripe.paymentIntents.create({
+         amount: amount,
+         currency: 'usd',
+         payment_method_types: ['card'],
+      })
+      res.send({ clientSecret: client_secret })
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+
+// ---------- Payment History Api ---------
+// Add Single PaymentData 
+app.post('/e-parcel/api/v1/add-payment-details', verifyToken, async (req, res) => {
+   try {
+      const paymentDetails = req.body;
+      const result = await paymentHistoryCollection.insertOne(paymentDetails);
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+
+// Get user specific  bookings data by email address 
+app.get('/e-parcel/api/v1/user-payment-history/:email', verifyToken, async (req, res) => {
+   try {
+      const { email } = req.params;
+      if (email !== req.user?.email) {
+         return res.status(403).send({ message: 'Forbidden Access', code: 403 })
+      }
+      const query = { userEmail: email };
+      const result = await paymentHistoryCollection.find(query).toArray();
+      return res.send(result);
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+
+//  ------- State Data Apis --------
+// Home Page Stat Data
+app.get('/e-parcel/api/v1/hompage-state', async (req, res) => {
+
+   try {
+      const topDeliveryMan = await userCollection.find({ role: 'deliveryMan' }).limit(5).sort({ totalParcelDelivered: 'desc' }).toArray()
+      const userCount = await userCollection.countDocuments({ role: 'user' })
+      const totalParcelBooked = await parcelBookingCollection.countDocuments();
+      const totalDelivered = await parcelBookingCollection.countDocuments({ status: 'delivered' })
+
+      // console.log(userCount,totalParcelBooked,totalDelivered);
+      res.send({
+         userCount,
+         totalParcelBooked,
+         totalDelivered,
+         topDeliveryMan
+      })
+   } catch (error) {
+      return res.send({ error: true, message: error.message });
+   }
+})
+// Admin  Stat Data
+app.get('/e-parcel/api/v1/admin-state', async (req, res) => {
+   // console.log('req hit');
+   try {
+      const allBookingsData = await parcelBookingCollection.find().toArray()
+      const allDeliveredData = await parcelBookingCollection.find({ status: 'delivered' }).toArray()
+      const bookingsByDate = {};
+      const deliveredByDate = {};
+
+
+      allBookingsData?.forEach(booking => {
+         const date = booking?.bookingDate;
+         if (bookingsByDate[date]) {
+            bookingsByDate[date]++;
+         } else {
+            bookingsByDate[date] = 1;
+         }
+      });
+      allDeliveredData?.forEach(booking => {
+         const date = booking?.bookingDate;
+         if (deliveredByDate[date]) {
+            deliveredByDate[date]++;
+         } else {
+            deliveredByDate[date] = 1;
+         }
+      });
+      const totalUser = await userCollection.countDocuments({ role: 'user' })
+      const totalDeliveryMan = await userCollection.countDocuments({ role: 'deliveryMan' })
+      const totalParcelBooked = await parcelBookingCollection.countDocuments();
+      const totalParcelDelivered = await parcelBookingCollection.countDocuments({ status: 'delivered' })
+      const bookingDates = Object.keys(bookingsByDate);
+      const numberOfBookingsByDate = Object.values(bookingsByDate);
+      //   ToDo Have To asign Delivery Date
+      const numberOfDeliveredByDate = Object.values(deliveredByDate);
+
+
+      const adminStateData = {
+         totalUser,
+         totalDeliveryMan,
+         totalParcelBooked,
+         totalParcelDelivered,
+         bookingDates,
+         numberOfBookingsByDate,
+         numberOfDeliveredByDate
+      }
+      res.send(adminStateData)
+   } catch (error) {
       return res.send({ error: true, message: error.message });
    }
 })
@@ -320,17 +441,3 @@ app.listen(port, () => {
    console.log(`server listening on port ${port}`);
 });
 
-
-// -------- Payment Apis -------  
-// Generate client secret for stripe payment
-app.post('/create-payment-intent', verifyToken, async (req, res) => {
-   const { price } = req.body
-   const amount = parseInt(price * 100)
-   if (!price || amount < 1) return
-   const { client_secret } = await stripe.paymentIntents.create({
-      amount: amount,
-      currency: 'usd',
-      payment_method_types: ['card'],
-   })
-   res.send({ clientSecret: client_secret })
-})
